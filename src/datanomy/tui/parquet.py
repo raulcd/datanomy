@@ -5,7 +5,8 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.widgets import Static
+from textual.containers import HorizontalScroll, Vertical
+from textual.widgets import DataTable, Static
 
 from datanomy.reader.parquet import ParquetReader
 from datanomy.tui.common import create_column_grid
@@ -736,6 +737,7 @@ class DataTab(BaseParquetTab):
         """
         super().__init__(reader)
         self.num_rows = num_rows
+        self.id = "data-content"
 
     @staticmethod
     def _format_value(value: Any, max_length: int = 50) -> str:
@@ -782,80 +784,96 @@ class DataTab(BaseParquetTab):
 
         return table, num_rows_display, total_rows
 
-    def _create_data_table(self, table: Any, num_rows_display: int) -> Panel:
+    def _create_data_table(self, table: Any, num_rows_display: int) -> DataTable:
         """
-        Create Rich table with data rows.
+        Create a Textual ``DataTable`` widget populated with preview rows.
 
         Parameters
         ----------
-            table: PyArrow table
-            num_rows_display: Number of rows to display
+            table: PyArrow table slice for preview rendering
+            num_rows_display: Number of rows to include in the table
 
         Returns
         -------
-            Panel: Rich Panel containing data table
+            DataTable: Configured widget ready for display
         """
-        # Create Rich table
-        data_table = Table(
-            show_header=True,
-            header_style="bold cyan",
-            border_style="dim",
-            expand=False,
-            box=None,
-        )
 
-        # Add columns
-        for col_name in table.schema.names:
-            data_table.add_column(col_name, style="white", no_wrap=False)
+        data_table: DataTable = DataTable(id="data-preview-table")
+        data_table.show_row_labels = False
+        data_table.show_cursor = True
+        data_table.cursor_type = "cell"
+        data_table.zebra_stripes = True
+        data_table.border_title = "Data Preview"
+        data_table.styles.border = ("round", "cyan")
+        data_table.styles.width = "auto"
+        data_table.styles.margin = (1, 0, 0, 0)
 
-        # Add rows
-        for i in range(num_rows_display):
+        columns = list(table.schema.names)
+        if not columns:
+            return data_table
+
+        min_width = max(80, sum(max(12, len(name) + 2) for name in columns))
+        data_table.styles.min_width = min_width
+
+        data_table.add_columns(*columns)
+
+        for row_idx in range(num_rows_display):
             row_values: list[str | Text] = []
-            for col_name in table.schema.names:
-                value = table[col_name][i].as_py()
+            for name in columns:
+                value = table[name][row_idx].as_py()
                 formatted_value = self._format_value(value)
-
-                # Style NULL values differently
                 if value is None:
                     row_values.append(Text(formatted_value, style="dim yellow"))
                 else:
                     row_values.append(formatted_value)
-
             data_table.add_row(*row_values)
 
-        # Wrap table in panel
-        return Panel(
-            data_table,
-            title="[cyan]Data Preview[/cyan]",
-            border_style="cyan",
-        )
+        return data_table
 
-    def render_tab_content(self) -> Group:
+    def compose(self) -> ComposeResult:
         """
-        Render data preview table.
+        Compose widgets for the data preview tab.
 
-        Returns
-        -------
-            Group: Rich renderable showing data rows
+        Yields
+        ------
+            ComposeResult: Child widgets making up the tab content
         """
-        # Read data from the Parquet file
+
         try:
             table, num_rows_display, total_rows = self._read_data()
         except Exception as e:
             error_text = Text()
             error_text.append(f"Error reading data: {e}", style="red")
-            return Group(Panel(error_text, title="[red]Error[/red]"))
+            yield Static(Panel(error_text, title="[red]Error[/red]"), id="data-content")
+            return
 
-        # Create header info
+        columns = list(table.schema.names)
+        data_widget: DataTable | None = None
+        empty_panel: Panel | None = None
+
+        if columns:
+            data_widget = self._create_data_table(table, num_rows_display)
+        else:
+            empty_text = Text("Parquet table has no columns", style="yellow")
+            empty_panel = Panel(
+                empty_text,
+                title="[cyan]Data Preview[/cyan]",
+                border_style="cyan",
+            )
+
         header_text = Text()
         header_text.append(
             f"Showing {num_rows_display:,} of {total_rows:,} rows", style="cyan bold"
         )
 
-        # Create data table
-        table_panel = self._create_data_table(table, num_rows_display)
+        with Vertical(id="data-content"):
+            yield Static(header_text)
 
-        return Group(header_text, Text(), table_panel)
+            if data_widget is not None:
+                with HorizontalScroll():
+                    yield data_widget
+            elif empty_panel is not None:
+                yield Static(empty_panel)
 
 
 class MetadataTab(BaseParquetTab):
