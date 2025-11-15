@@ -51,7 +51,7 @@ uv sync
 
 ```bash
 # Run without installing using uvx
-uvx "git+https://github.com/raulcd/datanomy.git" data.parquet
+uvx datanomy data.parquet
 
 # Inspect a Parquet file
 datanomy data.parquet
