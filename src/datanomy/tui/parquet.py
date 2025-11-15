@@ -798,15 +798,10 @@ class DataTab(BaseParquetTab):
             DataTable: Configured widget ready for display
         """
 
-        data_table: DataTable = DataTable(id="data-preview-table")
-        data_table.show_row_labels = False
-        data_table.show_cursor = True
-        data_table.cursor_type = "cell"
-        data_table.zebra_stripes = True
+        data_table: DataTable = DataTable(id="data-preview-table", zebra_stripes=True)
         data_table.border_title = "Data Preview"
         data_table.styles.border = ("round", "cyan")
         data_table.styles.width = "auto"
-        data_table.styles.margin = (1, 0, 0, 0)
 
         columns = list(table.schema.names)
         if not columns:
