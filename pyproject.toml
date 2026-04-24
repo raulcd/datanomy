@@ -9,7 +9,7 @@ authors = [
 requires-python = ">=3.10"
 dependencies = [
     "textual>=0.90.0",
-    "pyarrow>=22.0.0",
+    "pyarrow>=24.0.0",
     "rich>=13.0.0",
     "click>=8.1.0",
 ]
