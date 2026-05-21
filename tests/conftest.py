@@ -222,3 +222,110 @@ def invalid_ipc_file(tmp_path: Path) -> Path:
     file_path = tmp_path / "not_an_arrow.arrow"
     file_path.write_text("This is not an Arrow IPC file")
     return file_path
+
+
+@pytest.fixture
+def complex_ipc(tmp_path: Path) -> Path:
+    """Create an Arrow IPC file with complex types, nulls and multiple batches.
+
+    Includes int32, string_view (nulls + long string), float64 (nulls), bool (nulls),
+    list<string> (nulls), struct<city, zip> (nested nulls), and large_string (nulls).
+
+    Returns:
+        Path to the created Arrow IPC file
+    """
+    schema = pa.schema(
+        [
+            ("id", pa.int32()),
+            ("name", pa.string_view()),
+            ("score", pa.float64()),
+            ("is_active", pa.bool_()),
+            ("tags", pa.list_(pa.string())),
+            ("labels", pa.list_view(pa.string())),
+            (
+                "address",
+                pa.struct(
+                    [
+                        pa.field("city", pa.string()),
+                        pa.field("zip", pa.int32()),
+                    ]
+                ),
+            ),
+            ("notes", pa.large_string()),
+        ],
+        metadata={
+            b"created_by": b"datanomy tests",
+            b"description": b"Complex fixture with nulls and nested types",
+        },
+    )
+
+    batches = [
+        pa.record_batch(
+            {
+                "id": [1, 2, 3, 4, 5],
+                "name": pa.array(
+                    ["Alice", "Bob", None, "Diana-with-a-longer-name", "Eve"],
+                    type=pa.string_view(),
+                ),
+                "score": [9.5, None, 7.1, 8.8, None],
+                "is_active": [True, False, None, True, True],
+                "tags": [["eng", "senior"], ["eng"], None, ["design", "lead"], []],
+                "labels": pa.array(
+                    [["a", "b"], None, ["c"], [], ["d", "e"]],
+                    type=pa.list_view(pa.string()),
+                ),
+                "address": pa.array(
+                    [
+                        {"city": "Amsterdam", "zip": 1011},
+                        {"city": "Berlin", "zip": 10115},
+                        None,
+                        {"city": "Paris", "zip": 75001},
+                        {"city": "London", "zip": None},
+                    ],
+                    type=schema.field("address").type,
+                ),
+                "notes": pa.array(
+                    ["First hire", None, "On leave", "Designer", "New joiner"],
+                    type=pa.large_string(),
+                ),
+            },
+            schema=schema,
+        ),
+        pa.record_batch(
+            {
+                "id": [6, 7, 8, 9, 10],
+                "name": pa.array(
+                    ["Frank", None, "Hank-with-an-even-longer-name", "Ivy", "Jack"],
+                    type=pa.string_view(),
+                ),
+                "score": [None, 6.0, 8.3, None, 7.7],
+                "is_active": [True, None, True, False, True],
+                "tags": [["exec"], None, ["ops", "infra"], ["eng"], ["eng", "senior"]],
+                "labels": pa.array(
+                    [None, ["x"], ["y", "z"], [], ["w"]],
+                    type=pa.list_view(pa.string()),
+                ),
+                "address": pa.array(
+                    [
+                        {"city": "Madrid", "zip": 28001},
+                        None,
+                        {"city": "Rome", "zip": 195},
+                        {"city": "Vienna", "zip": None},
+                        {"city": "Prague", "zip": 11000},
+                    ],
+                    type=schema.field("address").type,
+                ),
+                "notes": pa.array(
+                    [None, "Part-time", "Ops lead", "Senior eng", None],
+                    type=pa.large_string(),
+                ),
+            },
+            schema=schema,
+        ),
+    ]
+
+    file_path = tmp_path / "complex.arrow"
+    with ipc.new_file(file_path, schema) as writer:
+        for batch in batches:
+            writer.write_batch(batch)
+    return file_path

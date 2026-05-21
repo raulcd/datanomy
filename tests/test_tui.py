@@ -158,3 +158,56 @@ async def test_ipc_app_with_multiple_batches(multi_batch_ipc: Path) -> None:
 
     async with app.run_test():
         app.query_one("#structure-content").render()
+
+
+# --- Buffers tab TUI tests ---
+
+
+@pytest.mark.asyncio
+async def test_ipc_buffers_tab_present(simple_ipc: Path) -> None:
+    """Test that the Buffers tab is present in the IPC app."""
+    reader = IPCReader(simple_ipc)
+    app = DatanomyApp(reader)
+
+    async with app.run_test():
+        assert app.query_one("#tab-buffers") is not None
+
+
+@pytest.mark.asyncio
+async def test_ipc_buffers_tab_renders_simple(simple_ipc: Path) -> None:
+    """Test that the Buffers tab renders without error for a simple IPC file."""
+    reader = IPCReader(simple_ipc)
+    app = DatanomyApp(reader)
+
+    async with app.run_test():
+        app.query_one("#buffers-content").render()
+
+
+@pytest.mark.asyncio
+async def test_ipc_buffers_tab_renders_complex(complex_ipc: Path) -> None:
+    """Test that the Buffers tab handles complex types (string_view, list, struct, large_string, nulls)."""
+    reader = IPCReader(complex_ipc)
+    app = DatanomyApp(reader)
+
+    async with app.run_test():
+        app.query_one("#buffers-content").render()
+
+
+@pytest.mark.asyncio
+async def test_ipc_buffers_tab_renders_multi_batch(multi_batch_ipc: Path) -> None:
+    """Test that the Buffers tab renders two batches side by side."""
+    reader = IPCReader(multi_batch_ipc)
+    app = DatanomyApp(reader)
+
+    async with app.run_test():
+        app.query_one("#buffers-content").render()
+
+
+@pytest.mark.asyncio
+async def test_ipc_buffers_tab_renders_empty(empty_ipc: Path) -> None:
+    """Test that the Buffers tab handles an IPC file with no record batches."""
+    reader = IPCReader(empty_ipc)
+    app = DatanomyApp(reader)
+
+    async with app.run_test():
+        app.query_one("#buffers-content").render()

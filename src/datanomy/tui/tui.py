@@ -6,10 +6,11 @@ from textual.widgets import Footer, Header, TabbedContent, TabPane
 
 from datanomy.reader.ipc import IPCReader
 from datanomy.reader.parquet import ParquetReader
-from datanomy.tui.ipc import DataTab as IPCDataTab
-from datanomy.tui.ipc import MetadataTab as IPCMetadataTab
-from datanomy.tui.ipc import SchemaTab as IPCSchemaTab
-from datanomy.tui.ipc import StructureTab as IPCStructureTab
+from datanomy.tui.arrow import BuffersTab as IPCBuffersTab
+from datanomy.tui.arrow import DataTab as IPCDataTab
+from datanomy.tui.arrow import MetadataTab as IPCMetadataTab
+from datanomy.tui.arrow import SchemaTab as IPCSchemaTab
+from datanomy.tui.arrow import StructureTab as IPCStructureTab
 from datanomy.tui.parquet import DataTab, MetadataTab, SchemaTab, StatsTab, StructureTab
 
 
@@ -25,7 +26,7 @@ class DatanomyApp(App):
         padding: 1;
     }
 
-    #structure-content, #schema-content, #stats-content, #data-content {
+    #structure-content, #schema-content, #stats-content, #data-content, #buffers-content {
         padding: 1;
     }
     """
@@ -96,3 +97,5 @@ class DatanomyApp(App):
             yield ScrollableContainer(IPCDataTab(self.reader))
         with TabPane("Metadata", id="tab-metadata"):
             yield ScrollableContainer(IPCMetadataTab(self.reader))
+        with TabPane("Buffers", id="tab-buffers"):
+            yield ScrollableContainer(IPCBuffersTab(self.reader))

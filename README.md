@@ -5,9 +5,10 @@
 **Datanomy** is a terminal-based tool for inspecting and understanding data files.
 It provides an interactive view of your data's structure, metadata, and internal organization.
 
-Currently only Parquet available:
+## Supported formats
 
-![Parquet demo](https://github.com/user-attachments/assets/87f2f0ad-2eec-480d-b461-370ac3af6122)
+- **Parquet** (`.parquet`, `.parq`)
+- **Arrow IPC** (`.arrow`, `.feather`, `.ipc`)
 
 ## Features for Parquet view
 
@@ -30,6 +31,28 @@ Currently only Parquet available:
 ### Stats
 
 ![Stats](https://github.com/user-attachments/assets/f437a6a8-be71-413b-b15f-10b4376df981)
+
+## Features for Arrow IPC view
+
+### Structure
+
+File-level layout showing header, record batches, and footer.
+
+### Schema
+
+Arrow schema with per-column type and nullability details.
+
+### Data
+
+Preview of the first 50 rows.
+
+### Metadata
+
+File and schema-level metadata.
+
+### Buffers
+
+Physical buffer layout for each column — validity bitmap bits (color-coded valid/null), hex preview of values, offsets, and data buffers. For nested types (list, struct, map, dictionary) child array buffers are shown recursively.
 
 ## Installation
 
@@ -55,12 +78,16 @@ uvx datanomy data.parquet
 
 # Inspect a Parquet file
 datanomy data.parquet
+
+# Inspect an Arrow IPC file
+datanomy data.arrow
 ```
 
 You can also use from source using uvx. This uses the development version:
 
 ```bash
 uvx "git+https://github.com/raulcd/datanomy.git" data.parquet
+uvx "git+https://github.com/raulcd/datanomy.git" data.arrow
 ```
 
 ## Keyboard Shortcuts
@@ -75,6 +102,7 @@ uv sync
 
 # Run from source
 uv run datanomy path/to/file.parquet
+uv run datanomy path/to/file.arrow
 ```
 
 ```bash
