@@ -153,6 +153,46 @@ def _bool_values_text(
     return t
 
 
+def _fixed_size_binary_text(
+    buf: pa.Buffer,
+    validity_buf: pa.Buffer | None,
+    n: int,
+    byte_width: int,
+) -> Text:
+    """
+    Render a fixed-size binary values buffer as hex strings.
+
+    Each value occupies exactly byte_width bytes; null values are shown as dim '-'.
+
+    Parameters
+    ----------
+        buf: Raw values buffer (n * byte_width bytes)
+        validity_buf: Validity bitmap buffer (None means all values are valid)
+        n: Number of elements
+        byte_width: Fixed byte width per value (from the type)
+
+    Returns
+    -------
+        Text: Rich Text with hex strings separated by two spaces; nulls as dim '-'
+    """
+    raw = np.frombuffer(buf, dtype="uint8")
+    if validity_buf is not None and len(validity_buf) > 0:
+        valid = np.unpackbits(
+            np.frombuffer(validity_buf, dtype="uint8"), bitorder="little"
+        )[:n]
+    else:
+        valid = np.ones(n, dtype="uint8")
+    t = Text()
+    for i in range(n):
+        if i > 0:
+            t.append("  ")
+        if not valid[i]:
+            t.append("-", style="dim")
+        else:
+            t.append(raw[i * byte_width : (i + 1) * byte_width].tobytes().hex())
+    return t
+
+
 def _data_text(buf: pa.Buffer) -> Text:
     """
     Decode a raw data buffer as UTF-8 text via np.frombuffer.
@@ -392,6 +432,9 @@ def _is_supported(t: pa.DataType) -> bool:
         or pa.types.is_dictionary(t)
         or pa.types.is_fixed_size_list(t)
         or pa.types.is_map(t)
+        or pa.types.is_fixed_size_binary(t)
+        or pa.types.is_run_end_encoded(t)
+        or pa.types.is_union(t)
         or pa.types.is_primitive(t)
     )
 
@@ -433,6 +476,57 @@ def _walk_and_render(
         # placeholder; consume it to keep the cursor aligned with array.buffers().
         next_buf()
         items += [Text(f"{prefix}(null type — no buffers)", style="dim"), Text()]
+        return
+
+    if pa.types.is_run_end_encoded(t):
+        # REE has no own validity bitmap. Consume the [None] placeholder then
+        # recurse into the two children: run_ends and values.
+        next_buf()
+        _walk_and_render(
+            t.run_end_type,
+            array.run_ends,
+            len(array.run_ends),
+            f"{prefix}Run-ends — ",
+            next_buf,
+            items,
+        )
+        _walk_and_render(
+            t.value_type,
+            array.values,
+            len(array.values),
+            f"{prefix}Values — ",
+            next_buf,
+            items,
+        )
+        return
+
+    if pa.types.is_union(t):
+        # Union arrays have no validity bitmap. Consume the [None] placeholder,
+        # then type_ids, then offsets (dense only), then each child's buffers.
+        next_buf()
+        type_ids_buf = next_buf()
+        if type_ids_buf is not None:
+            items += _buffer_items(
+                f"{prefix}Type IDs buffer", _numeric_text(type_ids_buf, "int8", n)
+            )
+        if t.mode == "dense":
+            offsets_buf = next_buf()
+            if offsets_buf is not None:
+                items += _buffer_items(
+                    f"{prefix}Offsets buffer", _numeric_text(offsets_buf, "int32", n)
+                )
+        for i in range(t.num_fields):
+            field = t.field(i)
+            child = array.field(i)
+            child_n = n if t.mode == "sparse" else len(child)
+            _walk_and_render(
+                field.type,
+                child,
+                child_n,
+                f'{prefix}Child "{field.name}" — ',
+                next_buf,
+                items,
+            )
         return
 
     # Every other supported type has a validity bitmap as its first buffer
@@ -595,6 +689,14 @@ def _walk_and_render(
         _walk_and_render(
             t.item_type, values, entries_n, f"{prefix}Value — ", next_buf, items
         )
+
+    elif pa.types.is_fixed_size_binary(t):
+        buf = next_buf()
+        if buf is not None:
+            items += _buffer_items(
+                f"{prefix}Values buffer",
+                _fixed_size_binary_text(buf, validity_buf, n, t.byte_width),
+            )
 
     elif pa.types.is_primitive(t):
         buf = next_buf()

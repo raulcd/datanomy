@@ -428,20 +428,53 @@ def test_column_panel_dictionary() -> None:
     assert isinstance(panel, Panel)
 
 
-def test_column_panel_unsupported_type_shows_message() -> None:
-    """Unsupported types (e.g. run_end_encoded) show a 'not yet supported' message."""
+def test_column_panel_run_end_encoded() -> None:
+    """Run-end encoded column renders run-ends and values children without error."""
     arr = pa.RunEndEncodedArray.from_arrays(
         run_ends=pa.array([2, 4, 5], type=pa.int32()),
         values=pa.array(["a", "b", "c"]),
     )
-    panel = column_panel("ree_col", arr)
-    assert isinstance(panel, Panel)
-    import io
-    from rich.console import Console
+    assert isinstance(column_panel("ree_col", arr), Panel)
 
-    buf = io.StringIO()
-    Console(file=buf, width=120).print(panel)
-    assert "not yet supported" in buf.getvalue()
+
+def test_column_panel_sparse_union() -> None:
+    """Sparse union column renders type-ids and child buffers without error."""
+    arr = pa.UnionArray.from_sparse(
+        pa.array([0, 1, 0, 1], type=pa.int8()),
+        [
+            pa.array([1, 0, 3, 0], type=pa.int32()),
+            pa.array([None, "a", None, "b"], type=pa.utf8()),
+        ],
+    )
+    assert isinstance(column_panel("su_col", arr), Panel)
+
+
+def test_column_panel_dense_union() -> None:
+    """Dense union column renders type-ids, offsets and child buffers without error."""
+    arr = pa.UnionArray.from_dense(
+        pa.array([0, 1, 0, 1], type=pa.int8()),
+        pa.array([0, 0, 1, 1], type=pa.int32()),
+        [
+            pa.array([1, 3], type=pa.int32()),
+            pa.array(["a", "b"], type=pa.utf8()),
+        ],
+    )
+    assert isinstance(column_panel("du_col", arr), Panel)
+
+
+def test_column_panel_fixed_size_binary() -> None:
+    """Fixed-size binary column renders values as hex strings without error."""
+    arr = pa.array(
+        [b"hello123456789ab", None, b"ABCDEFGHIJKLMNOP"],
+        type=pa.binary(16),
+    )
+    assert isinstance(column_panel("uuid_col", arr), Panel)
+
+
+def test_column_panel_timestamp() -> None:
+    """Timestamp column (primitive type) renders without error."""
+    arr = pa.array([1704067200, None, 1717200000], type=pa.timestamp("s"))
+    assert isinstance(column_panel("ts_col", arr), Panel)
 
 
 def test_column_panel_single_row() -> None:
