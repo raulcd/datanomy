@@ -255,24 +255,28 @@ def test_data_text_non_ascii() -> None:
 
 
 def test_string_view_text_inline() -> None:
-    """Short strings (<=12 bytes) are shown inline in quotes."""
+    """Short strings (<=12 bytes) are shown as 'length  data'."""
     arr = pa.array(["hi", "bye"], type=pa.string_view())
     views_buf = arr.buffers()[1]
     assert views_buf is not None
     result = _string_view_text(views_buf, None, 2)
     assert isinstance(result, Text)
-    assert '"hi"' in result.plain
-    assert '"bye"' in result.plain
+    assert "2" in result.plain
+    assert "hi" in result.plain
+    assert "3" in result.plain
+    assert "bye" in result.plain
 
 
 def test_string_view_text_long() -> None:
-    """Long strings (>12 bytes) show len/prefix/buf/offset metadata."""
+    """Long strings (>12 bytes) show 'length  prefix  buf_index  offset'."""
     arr = pa.array(["a-string-longer-than-twelve-bytes"], type=pa.string_view())
     views_buf = arr.buffers()[1]
     assert views_buf is not None
     result = _string_view_text(views_buf, None, 1)
     assert isinstance(result, Text)
-    assert "len=" in result.plain
+    assert "33" in result.plain
+    assert "a-st" in result.plain
+    assert "0" in result.plain
 
 
 def test_string_view_text_with_nulls() -> None:
