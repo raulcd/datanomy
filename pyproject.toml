@@ -1,6 +1,6 @@
 [project]
 name = "datanomy"
-version = "0.3.0"
+version = "0.3.1"
 description = "Explore the anatomy of your columnar data files (Parquet, Arrow, and more)"
 readme = "README.md"
 authors = [
