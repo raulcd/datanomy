@@ -218,10 +218,10 @@ def _string_view_text(
     """
     Render the views buffer for string_view / binary_view arrays.
 
-    Each view is 16 bytes read via np.frombuffer. Short strings (len <= 12) are
-    stored inline in the view and shown decoded. Longer strings reference a
-    variadic buffer: the view stores the total length, the first 4 bytes as a
-    prefix, the buffer index, and the byte offset within that buffer.
+    Each view is 16 bytes. Format mirrors the Arrow spec diagram:
+      - null:         -
+      - short (≤12):  length  data
+      - long  (>12):  length  prefix  buffer_index  offset
 
     Parameters
     ----------
@@ -231,7 +231,7 @@ def _string_view_text(
 
     Returns
     -------
-        Text: Rich Text with one entry per row
+        Text: Rich Text with one entry per element
     """
     raw = np.frombuffer(views_buf, dtype="uint8")
 
@@ -251,16 +251,21 @@ def _string_view_text(
         view = raw[i * 16 : (i + 1) * 16].tobytes()
         length = _struct.unpack_from("<i", view, 0)[0]
         if length <= 12:
-            data = view[4 : 4 + length]
-            t.append(f'"{data.decode("utf-8", errors="replace")}"', style="green")
+            data = view[4 : 4 + length].decode("utf-8", errors="replace")
+            t.append(str(length))
+            t.append("  ")
+            t.append(data, style="green")
         else:
             prefix = view[4:8].decode("utf-8", errors="replace")
             buf_index = _struct.unpack_from("<i", view, 8)[0]
             offset = _struct.unpack_from("<i", view, 12)[0]
-            t.append(
-                f'len={length} prefix="{prefix}" buf={buf_index} off={offset}',
-                style="yellow",
-            )
+            t.append(str(length))
+            t.append("  ")
+            t.append(prefix, style="green")
+            t.append("  ")
+            t.append(str(buf_index))
+            t.append("  ")
+            t.append(str(offset))
     return t
 
 
